@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Shopify Lead Genius PRO</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;800&display=swap');
+        body { font-family: 'Plus Jakarta Sans', sans-serif; background-color: #020617; }
+        .glass { background: rgba(15, 23, 42, 0.7); backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.05); }
+    </style>
+</head>
+<body class="text-slate-100">
+    <div class="max-w-6xl mx-auto px-6 py-12">
+        
+        <div class="flex justify-between items-center mb-10 pb-6 border-b border-slate-800">
+            <div>
+                <h1 class="text-2xl font-black tracking-tighter uppercase text-blue-500">ShopifyLead<span class="text-white">Genius</span></h1>
+                <div id="engine-status" class="text-[10px] font-bold mt-1 text-red-400 uppercase tracking-widest">
+                    <i class="fas fa-circle mr-1"></i> Engine Offline
+                </div>
+            </div>
+            <div class="text-right hidden md:block">
+                <p class="text-[10px] text-slate-500 font-bold uppercase tracking-widest">Targeting</p>
+                <p class="text-xs font-bold text-slate-300">Global Shopify Stores</p>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-4 gap-8">
+            <div class="lg:col-span-1 space-y-4">
+                <div class="glass p-6 rounded-3xl">
+                    <label class="text-[10px] font-black text-slate-500 uppercase mb-2 block">Niche</label>
+                    <input id="niche" type="text" value="Coffee" class="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-2 mb-4 text-sm outline-none focus:border-blue-500">
+                    
+                    <label class="text-[10px] font-black text-slate-500 uppercase mb-2 block">Country</label>
+                    <select id="country" class="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-2 mb-6 text-sm outline-none">
+                        <option value="USA">USA</option>
+                        <option value="UK">UK</option>
+                        <option value="Canada">Canada</option>
+                    </select>
+
+                    <button id="scan-btn" onclick="startScan()" class="w-full bg-blue-600 hover:bg-blue-500 py-3 rounded-xl font-bold text-xs uppercase tracking-widest transition-all">
+                        Find Leads
+                    </button>
+                </div>
+            </div>
+
+            <div class="lg:col-span-3">
+                <div class="glass rounded-3xl overflow-hidden">
+                    <table class="w-full text-left text-sm">
+                        <thead class="bg-slate-900/80 border-b border-slate-800">
+                            <tr>
+                                <th class="p-4 text-[10px] uppercase text-slate-500">Store</th>
+                                <th class="p-4 text-[10px] uppercase text-slate-500">Email</th>
+                                <th class="p-4 text-[10px] uppercase text-slate-500 text-center">Score</th>
+                                <th class="p-4 text-[10px] uppercase text-slate-500 text-right">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody id="results-body">
+                            <tr>
+                                <td colspan="4" class="p-20 text-center text-slate-600 italic">No active scan...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        async function startScan() {
+            const niche = document.getElementById('niche').value;
+            const country = document.getElementById('country').value;
+            const btn = document.getElementById('scan-btn');
+            
+            btn.innerText = "Scanning...";
+            btn.disabled = true;
+
+            try {
+                const res = await fetch('http://localhost:5000/api/scan', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ niche, country })
+                });
+                const leads = await res.json();
+                renderLeads(leads);
+            } catch (err) {
+                alert("Start your server.py first!");
+            } finally {
+                btn.innerText = "Find Leads";
+                btn.disabled = false;
+            }
+        }
+
+        function renderLeads(leads) {
+            const body = document.getElementById('results-body');
+            body.innerHTML = leads.map(l => `
+                <tr class="border-b border-slate-800/50 hover:bg-white/5">
+                    <td class="p-4 font-bold text-blue-400">${l.name}</td>
+                    <td class="p-4 text-slate-400">${l.email}</td>
+                    <td class="p-4 text-center">
+                        <span class="px-2 py-1 rounded-md bg-emerald-500/10 text-emerald-400 text-[10px] font-black">${l.seo_score}%</span>
+                    </td>
+                    <td class="p-4 text-right">
+                        <button onclick='downloadPDF(${JSON.stringify(l)})' class="text-[10px] font-black uppercase text-white bg-slate-800 px-3 py-1 rounded-md hover:bg-slate-700">Audit</button>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        async function downloadPDF(lead) {
+            const res = await fetch('http://localhost:5000/api/generate-pdf', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(lead)
+            });
+            const blob = await res.blob();
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `Audit_${lead.name}.pdf`;
+            a.click();
+        }
+
+        async function checkConnection() {
+            const status = document.getElementById('engine-status');
+            try {
+                await fetch('http://localhost:5000/api/scan', { method: 'POST', body: '{}', headers: {'Content-Type':'application/json'} });
+                status.innerHTML = '<i class="fas fa-circle mr-1"></i> Engine Online';
+                status.className = "text-[10px] font-bold mt-1 text-emerald-400 uppercase tracking-widest";
+            } catch {
+                status.innerHTML = '<i class="fas fa-circle mr-1"></i> Engine Offline';
+                status.className = "text-[10px] font-bold mt-1 text-red-400 uppercase tracking-widest";
+            }
+        }
+        setInterval(checkConnection, 5000);
+        checkConnection();
+    </script>
+</body>
+</html>
